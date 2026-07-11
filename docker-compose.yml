@@ -44,6 +44,20 @@ services:
     networks:
       - private_net  # Sits strictly in the isolated private subnet
 
+
+  # ADDING THE VPN GATEWAY
+  vpn_gateway:
+    image: kylemanna/openvpn
+    container_name: vpn_gateway
+    ports:
+      - "1194:1194/udp" # Expose the VPN port to your host machine
+    volumes:
+      - ./openvpn-data:/etc/openvpn
+    cap_add:
+      - NET_ADMIN # Required to configure the secure network tunnel
+    networks:
+      - private_net # Gives the VPN server direct access to your private database
+
 networks:
   public_net:
     driver: bridge

@@ -1,0 +1,53 @@
+graph TD
+    subgraph Internet_Space ["The Public Internet"]
+        User([User / Laptop])
+        Developer["Developer Laptop (pgAdmin)"]
+        WWW["External APIs (GitHub / Stripe)"]
+    end
+
+    subgraph VPC ["VPC - 10.0.0.0/16"]
+        
+        subgraph Public_Subnet ["Public Subnet - 10.0.1.0/24"]
+            nginx["nginx_proxy<br>(10.0.1.x)"]
+            nat["nat_gateway<br>(10.0.1.50)"]
+        end
+
+        subgraph Private_Subnet ["Private Subnet - 10.0.2.0/24"]
+            vpn["vpn_gateway<br>(10.0.2.100)"]
+            backend["app_backend<br>(10.0.1.y & 10.0.2.x)"]
+            postgres["postgres_db<br>(10.0.2.y)"]
+        end
+
+    end
+
+    %% Inbound Web Traffic
+    User --> nginx
+    nginx --> backend
+    backend --> postgres
+
+    %% Secure Admin Inbound via VPN
+    Developer ===> vpn
+    vpn ----> postgres
+
+    %% Outbound Traffic via NAT
+    backend --> nat
+    nat --> WWW
+
+    %% Styling
+    style Internet_Space fill:#FFFFFF,stroke:#000000,stroke-width:2px,color:#000000
+    style VPC fill:#E3F2FD,stroke:#0D47A1,stroke-width:3px,color:#000000
+    style Public_Subnet fill:#FFFDE7,stroke:#F57F17,stroke-width:2px,color:#000000
+    style Private_Subnet fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000000
+    
+    style User fill:#000000,stroke:#000000,color:#FFFFFF
+    style Developer fill:#7E57C2,stroke:#5E35B1,color:#FFFFFF
+    style WWW fill:#000000,stroke:#000000,color:#FFFFFF
+    style nginx fill:#1565C0,stroke:#0D47A1,color:#FFFFFF
+    style nat fill:#D32F2F,stroke:#9A0007,color:#FFFFFF
+    style vpn fill:#7E57C2,stroke:#5E35B1,color:#FFFFFF
+    style backend fill:#E65100,stroke:#BF360C,color:#FFFFFF
+    style postgres fill:#2E7D32,stroke:#1B5E20,color:#FFFFFF
+
+    %% Specific Line Coloring
+    linkStyle 3 stroke:#7E57C2,stroke-width:3px;
+    linkStyle 5 stroke:#D32F2F,stroke-width:2px;
