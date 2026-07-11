@@ -41,6 +41,25 @@ app.get('/health', async (_req, res) => {
   }
 });
 
+app.get('/check-nat-gateway', async (_req, res) =>{
+
+  try {
+        // 1. Call the external GET API
+        const externalResponse = await fetch('https://jsonplaceholder.typicode.com/todos/1');
+        
+        // 2. Parse the incoming JSON data
+        const data = await externalResponse.json();
+        
+        // 3. Send the data back to your client
+        res.json(data);
+    } catch (error) {
+        // Handle errors gracefully
+        console.error('Error fetching external API:', error);
+        res.status(500).json({ error: 'Failed to fetch external data' });
+    }
+
+});
+
 app.get('/users', async (_req, res) => {
   try {
     const result = await pool.query('SELECT id, name FROM users ORDER BY id');

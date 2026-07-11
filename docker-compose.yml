@@ -1,19 +1,23 @@
 version: '3.8'
 
 services:
+  # 1. PUBLIC INGRESS: Router for Web Traffic
   nginx_proxy:
     image: nginx:alpine
+    container_name: nginx_proxy
     ports:
-      - "8080:80"   # The ONLY entry point from the outside world (Host Machine)
+      - "8080:80"   # Edge gateway mapped to your physical laptop
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
-      - public_net  # Sits strictly in the public subnet
+      - public_net  # Strict placement in Public Subnet
     depends_on:
       - app_backend
 
+  # 2. APPLICATION LAYER: The bridge component linking both tiers
   app_backend:
     image: node:20-alpine
+    container_name: app_backend
     working_dir: /app
     volumes:
       - .:/app
@@ -25,47 +29,66 @@ services:
       PGUSER: user
       PGPASSWORD: password
       PGDATABASE: postgres
-    # REMOVED ports config to isolate it from your host machine
     networks:
-      - public_net   # Accessible ONLY by Nginx
-      - private_net  # Can talk to the Database
+      - public_net   # Receives traffic from Nginx
+      - private_net  # Pulls/Pushes data to Postgres
     depends_on:
       - postgres_db
+      - nat_gateway
 
+  # 3. DATA LAYER: Isolated Database (Zero host ports mapped)
   postgres_db:
     image: postgres:15-alpine
+    container_name: postgres_db
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: postgres
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    # REMOVED ports config so no one can bypass the network to attack DB directly
     networks:
-      - private_net  # Sits strictly in the isolated private subnet
+      - private_net  # Locked completely in Private Subnet
 
-
-  # ADDING THE VPN GATEWAY
+  # 4. VPN GATEWAY: Secure Inbound Entry for Admins
   vpn_gateway:
     image: kylemanna/openvpn
     container_name: vpn_gateway
     ports:
-      - "1194:1194/udp" # Expose the VPN port to your host machine
+      - "1194:1194/udp" # Port for your VPN client application
     volumes:
       - ./openvpn-data:/etc/openvpn
     cap_add:
-      - NET_ADMIN # Required to configure the secure network tunnel
+      - NET_ADMIN      # Allows container to modify system routing
     networks:
-      - private_net # Gives the VPN server direct access to your private database
+      private_net:
+        ipv4_address: 10.0.2.100
+
+  # 5. NAT GATEWAY: Enables Private Services to safely check external APIs
+  nat_gateway:
+    image: alpine:latest
+    container_name: nat_gateway
+    privileged: true   # Grants permission to apply iptables firewall rules
+    command: >
+      sh -c "
+      echo 1 > /proc/sys/net/ipv4/ip_forward &&
+      apk add --no-cache iptables &&
+      iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE &&
+      sleep infinity
+      "
+    networks:
+      public_net:
+        ipv4_address: 10.0.1.50   # Interface facing the outer internet
+      private_net:
+        ipv4_address: 10.0.2.50   # Interface facing the private database/apps
 
 networks:
   public_net:
     driver: bridge
     ipam:
       config:
-        - subnet: 10.0.1.0/24  # Explicit CIDR Block for Public Subnet
+        - subnet: 10.0.1.0/24     # CIDR Range for public-facing components
   private_net:
     driver: bridge
     ipam:
       config:
-        - subnet: 10.0.2.0/24  # Explicit CIDR Block for Private Subnet
+        - subnet: 10.0.2.0/24     # CIDR Range for secure back-end workloads
