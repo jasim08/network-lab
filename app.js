@@ -5,24 +5,28 @@ const app = express();
 app.use(express.json());
 
 const pool = new Pool({
-  host: process.env.PGHOST || 'localhost',
-  port: Number(process.env.PGPORT || 8080),
+  host: process.env.PGHOST || 'postgres_db',
+  port: Number(process.env.PGPORT || 5432),
   user: process.env.PGUSER || 'user',
   password: process.env.PGPASSWORD || 'password',
   database: process.env.PGDATABASE || 'postgres',
 });
 
 async function initDb() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL
-      )
-    `);
-    console.log('Database ready');
-  } catch (err) {
-    console.error('Database initialization failed:', err.message);
+  for (let attempt = 1; attempt <= 10; attempt += 1) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(100) NOT NULL
+        )
+      `);
+      console.log('Database ready');
+      return;
+    } catch (err) {
+      console.error(`Database initialization failed (attempt ${attempt}/10):`, err.message);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
 }
 
@@ -39,7 +43,7 @@ app.get('/health', async (_req, res) => {
 
 app.get('/users', async (_req, res) => {
   try {
-    const result = await pool.query('SELECT id, source_ip FROM access_logs ORDER BY id');
+    const result = await pool.query('SELECT id, name FROM users ORDER BY id');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

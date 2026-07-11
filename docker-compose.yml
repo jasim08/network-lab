@@ -1,12 +1,14 @@
+version: '3.8'
+
 services:
   nginx_proxy:
     image: nginx:alpine
     ports:
-      - "8080:80"
+      - "8080:80"   # The ONLY entry point from the outside world (Host Machine)
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
-      - public_net
+      - public_net  # Sits strictly in the public subnet
     depends_on:
       - app_backend
 
@@ -23,11 +25,10 @@ services:
       PGUSER: user
       PGPASSWORD: password
       PGDATABASE: postgres
-    ports:
-      - "3000:3000"
+    # REMOVED ports config to isolate it from your host machine
     networks:
-      - public_net
-      - private_net
+      - public_net   # Accessible ONLY by Nginx
+      - private_net  # Can talk to the Database
     depends_on:
       - postgres_db
 
@@ -39,13 +40,18 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    expose:
-      - "5432"
+    # REMOVED ports config so no one can bypass the network to attack DB directly
     networks:
-      - private_net
+      - private_net  # Sits strictly in the isolated private subnet
 
 networks:
   public_net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.1.0/24  # Explicit CIDR Block for Public Subnet
   private_net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.2.0/24  # Explicit CIDR Block for Private Subnet
