@@ -1,0 +1,65 @@
+graph TD
+    %% Styling
+    classDef public fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b;
+    classDef private fill:#efebe9,stroke:#5d4037,stroke-width:2px,color:#3e2723;
+    classDef gateway fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20;
+    classDef host fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#263238;
+    classDef igw fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100;
+
+    %% Host Laptop (Outside World)
+    subgraph Host ["💻 Physical Laptop (External Network)"]
+        Browser["🌐 Web Browser"]
+        Terminal["📟 SSH Terminal Client"]
+    end
+    class Host,Browser,Terminal host;
+
+    %% Internet Gateway Layer (Implicit Docker Bridge Port Binding)
+    subgraph IGW_Layer ["🔌 Internet Gateway (IGW) / Port Translation"]
+        IGW["Docker Bridge Port Forwarder<br>(Maps Laptop Ports ➡️ Subnet IPs)"]
+    end
+    class IGW_Layer,IGW igw;
+
+    %% VPC Border
+    subgraph VPC ["🌐 Simulated VPC Space"]
+        
+        %% Public Subnet
+        subgraph PublicSubnet ["🔓 Public Subnet (10.0.1.0/24)"]
+            Nginx["nginx_proxy<br>(10.0.1.X)"]
+        end
+        class PublicSubnet,Nginx public;
+
+        %% Dual-Homed / Edge Boundary Tunnels
+        subgraph SubnetRouting ["🔀 Gateway & Cross-Subnet Interfaces"]
+            Bastion["bastion_host<br>(10.0.1.20 / 10.0.2.20)"]
+            NAT["nat_gateway<br>(10.0.1.50 / 10.0.2.50)"]
+            App["app_backend<br>(Dual-Homed)"]
+        end
+        class Bastion,App public;
+        class NAT gateway;
+
+        %% Private Subnet
+        subgraph PrivateSubnet ["🔒 Private Subnet (10.0.2.0/24)"]
+            Postgres["postgres_db<br>(10.0.2.X)"]
+        end
+        class PrivateSubnet,Postgres private;
+
+    end
+
+    %% Inbound Public Traffic Flow via IGW
+    Browser -->|Hits Port 8080| IGW
+    IGW -->|Forwards to Port 80| Nginx
+    Nginx -->|Proxy Pass| App
+
+    %% Inbound Admin Traffic Flow via IGW & Bastion
+    Terminal -->|Hits Port 2222| IGW
+    IGW -->|Forwards to Port 22| Bastion
+    Bastion -->|SSH Jump / Internal Access| Postgres
+    
+    %% Inter-subnet Application Queries
+    App -->|Read/Write Data| Postgres
+
+    %% Secure Outbound Traffic Flow via NAT
+    Postgres -.->|Outbound Updates / Connection| NAT
+    App -.->|Outbound npm install| NAT
+    NAT -.->|iptables MASQUERADE| IGW
+    IGW -.->|Exit to Internet| Host

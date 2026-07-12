@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # NEW LAYER: THE INTERNET GATEWAY (IGW)
+  # =========================================================================
+  # This acts as the single point of entry/exit for all public-facing traffic.
+  internet_gateway:
+    image: alpine:latest
+    container_name: internet_gateway
+    privileged: true
+    ports:
+      - "8080:80"     # Forwards web traffic to Nginx Proxy internally
+      - "1194:1194/udp" # Forwards admin VPN traffic to VPN Gateway internally
+    command: >
+      sh -c "
+      echo 1 > /proc/sys/net/ipv4/ip_forward &&
+      apk add --no-cache iptables socat &&
+      # Route external port 80 to Nginx Proxy inside the public net
+      iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination 10.0.1.10:80 &&
+      # Route external port 1194 to the VPN Gateway
+      iptables -t nat -A PREROUTING -p udp --dport 1194 -j DNAT --to-destination 10.0.2.100:1194 &&
+      # Ensure masquerading for outgoing packets
+      iptables -t nat -A POSTROUTING -j MASQUERADE &&
+      sleep infinity
+      "
+    networks:
+      public_net:
+        ipv4_address: 10.0.1.5    # The "Public IP" address of the IGW
+
+  # 1. PUBLIC INGRESS: Router for Web Traffic (No longer maps host ports directly)
+  nginx_proxy:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    # REMOVED host ports! It is now hidden behind the Internet Gateway
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      public_net:
+        ipv4_address: 10.0.1.10   # Fixed IP so IGW knows where to send traffic
+    depends_on:
+      - app_backend
+
+  # 2. APPLICATION LAYER: The bridge component linking both tiers
+  app_backend:
+    image: node:20-alpine
+    container_name: app_backend
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: sh -c "npm install && npm start"
+    environment:
+      PORT: 3000
+      PGHOST: postgres_db
+      PGPORT: 5432
+      PGUSER: user
+      PGPASSWORD: password
+      PGDATABASE: postgres
+    networks:
+      - public_net   
+      - private_net  
+    depends_on:
+      - postgres_db
+      - nat_gateway
+
+  # 3. DATA LAYER: Isolated Database
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - private_net  
+
+  # 4. VPN GATEWAY: Secure Inbound Entry for Admins
+  vpn_gateway:
+    image: kylemanna/openvpn
+    container_name: vpn_gateway
+    # REMOVED host ports! IGW handles the mapping now
+    volumes:
+      - ./openvpn-data:/etc/openvpn
+    cap_add:
+      - NET_ADMIN      
+    networks:
+      private_net:
+        ipv4_address: 10.0.2.100
+
+  # 5. NAT GATEWAY: Enables Private Services to safely check external APIs
+  nat_gateway:
+    image: alpine:latest
+    container_name: nat_gateway
+    privileged: true   
+    command: >
+      sh -c "
+      echo 1 > /proc/sys/net/ipv4/ip_forward &&
+      apk add --no-cache iptables &&
+      iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE &&
+      sleep infinity
+      "
+    networks:
+      public_net:
+        ipv4_address: 10.0.1.50   
+      private_net:
+        ipv4_address: 10.0.2.50   
+
+networks:
+  public_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.1.0/24     
+  private_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.2.0/24

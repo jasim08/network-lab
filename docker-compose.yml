@@ -1,16 +1,14 @@
-version: '3.8'
-
 services:
   # 1. PUBLIC INGRESS: Router for Web Traffic
   nginx_proxy:
     image: nginx:alpine
     container_name: nginx_proxy
     ports:
-      - "8080:80"   # Edge gateway mapped to your physical laptop
+      - "8080:80"   
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
-      - public_net  # Strict placement in Public Subnet
+      - public_net  
     depends_on:
       - app_backend
 
@@ -30,13 +28,13 @@ services:
       PGPASSWORD: password
       PGDATABASE: postgres
     networks:
-      - public_net   # Receives traffic from Nginx
-      - private_net  # Pulls/Pushes data to Postgres
+      - public_net   
+      - private_net  
     depends_on:
       - postgres_db
       - nat_gateway
 
-  # 3. DATA LAYER: Isolated Database (Zero host ports mapped)
+  # 3. DATA LAYER: Isolated Database
   postgres_db:
     image: postgres:15-alpine
     container_name: postgres_db
@@ -47,27 +45,40 @@ services:
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - private_net  # Locked completely in Private Subnet
+      - private_net  
 
-  # 4. VPN GATEWAY: Secure Inbound Entry for Admins
-  vpn_gateway:
-    image: kylemanna/openvpn
-    container_name: vpn_gateway
+  # =========================================================================
+  # NEW: BASTION HOST (Replaces the VPN Gateway for SSH administration)
+  # =========================================================================
+  # =========================================================================
+  # BULLETPROOF ALPINE BASTION HOST
+  # =========================================================================
+  bastion_host:
+    image: alpine:latest
+    container_name: bastion_host
     ports:
-      - "1194:1194/udp" # Port for your VPN client application
-    volumes:
-      - ./openvpn-data:/etc/openvpn
-    cap_add:
-      - NET_ADMIN      # Allows container to modify system routing
+      - "2222:22"
+    privileged: true
+    command: >
+      sh -c "
+      apk add --no-cache openssh-server openssh-client &&
+      ssh-keygen -A &&
+      echo 'root:admin123' | chpasswd &&
+      echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config &&
+      echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config &&
+      /usr/sbin/sshd -D
+      "
     networks:
+      public_net:
+        ipv4_address: 10.0.1.20
       private_net:
-        ipv4_address: 10.0.2.100
+        ipv4_address: 10.0.2.20
 
-  # 5. NAT GATEWAY: Enables Private Services to safely check external APIs
+  # 5. NAT GATEWAY: Outbound traffic proxy
   nat_gateway:
     image: alpine:latest
     container_name: nat_gateway
-    privileged: true   # Grants permission to apply iptables firewall rules
+    privileged: true   
     command: >
       sh -c "
       echo 1 > /proc/sys/net/ipv4/ip_forward &&
@@ -77,18 +88,18 @@ services:
       "
     networks:
       public_net:
-        ipv4_address: 10.0.1.50   # Interface facing the outer internet
+        ipv4_address: 10.0.1.50   
       private_net:
-        ipv4_address: 10.0.2.50   # Interface facing the private database/apps
+        ipv4_address: 10.0.2.50   
 
 networks:
   public_net:
     driver: bridge
     ipam:
       config:
-        - subnet: 10.0.1.0/24     # CIDR Range for public-facing components
+        - subnet: 10.0.1.0/24     
   private_net:
     driver: bridge
     ipam:
       config:
-        - subnet: 10.0.2.0/24     # CIDR Range for secure back-end workloads
+        - subnet: 10.0.2.0/24
