@@ -28,7 +28,7 @@ services:
     command: sh -c "npm install && npm start"
     environment:
       PORT: 3000
-      PGHOST: postgres_db.internal
+      PGHOST: postgres_db
       PGPORT: 5432
       PGUSER: user
       PGPASSWORD: password
