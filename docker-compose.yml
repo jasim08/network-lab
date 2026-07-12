@@ -1,25 +1,22 @@
 services:
   # =========================================================================
-  # 1. API GATEWAY & REVERSE PROXY / LOAD BALANCER
+  # EDGE: INTERNET GATEWAY & WAF / DDOS RATE LIMITING
   # =========================================================================
   nginx_gateway:
     image: nginx:alpine
     container_name: nginx_gateway
     ports:
-      - "8080:80"   # Exposed to your laptop via the IGW layer
+      - "8080:80"   
     volumes:
-      # We inject custom config for load balancing, rate limiting, and private proxying
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
-      public_net:
-        aliases:
-          - api.mycompany.internal # PRIVATE DNS: Internal routing alias
+      - gateway_to_backend_net # ZERO TRUST: Strict micro-segmentation
     depends_on:
       - app_backend_1
       - app_backend_2
 
   # =========================================================================
-  # 2. APPLICATION LAYER: Load Balanced Backend Replicas
+  # COMPUTE TIER: Isolated from direct gateway administration
   # =========================================================================
   app_backend_1:
     image: node:20-alpine
@@ -30,16 +27,14 @@ services:
     command: sh -c "npm install && npm start"
     environment:
       PORT: 3000
-      PGHOST: postgres_db.internal # PRIVATE DNS: Resolves strictly via internal zone
+      PGHOST: postgres_db.internal
       PGPORT: 5432
       PGUSER: user
       PGPASSWORD: password
       PGDATABASE: postgres
     networks:
-      public_net:
-        aliases:
-          - backend.internal # Private DNS round-robin group
-      private_net:
+      gateway_to_backend_net: # Access from API Gateway
+      backend_to_db_net:      # ZERO TRUST: Isolated pipeline to Database
 
   app_backend_2:
     image: node:20-alpine
@@ -56,13 +51,11 @@ services:
       PGPASSWORD: password
       PGDATABASE: postgres
     networks:
-      public_net:
-        aliases:
-          - backend.internal # Private DNS round-robin group
-      private_net:
+      gateway_to_backend_net: 
+      backend_to_db_net:      
 
   # =========================================================================
-  # 3. DATA LAYER: Secured Database with Private DNS Profile
+  # DATA LAYER: Strict Zero-Trust Enforcement
   # =========================================================================
   postgres_db:
     image: postgres:15-alpine
@@ -79,66 +72,21 @@ services:
       apk add --no-cache iptables &&
       iptables -F &&
       iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT &&
-      iptables -A INPUT -p tcp -s 10.0.2.20 --dport 5432 -j ACCEPT && 
+      # ZERO TRUST HOST FILTER: Drop everything that isn't an explicit application query
       iptables -A INPUT -p tcp --dport 5432 -j ACCEPT &&             
       iptables -P INPUT DROP &&                                       
       docker-entrypoint.sh postgres
       "
     networks:
-      private_net:
+      backend_to_db_net:
         aliases:
-          - postgres_db.internal # PRIVATE DNS: Only reachable inside private_net
+          - postgres_db.internal
 
-  # 4. BASTION HOST: Secure jump box
-  bastion_host:
-    image: alpine:latest
-    container_name: bastion_host
-    ports:
-      - "2222:22"
-    privileged: true
-    command: >
-      sh -c "
-      apk add --no-cache openssh-server openssh-client &&
-      ssh-keygen -A &&
-      echo 'root:admin123' | chpasswd &&
-      echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config &&
-      echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config &&
-      /usr/sbin/sshd -D
-      "
-    networks:
-      public_net:
-        ipv4_address: 10.0.1.20
-      private_net:
-        ipv4_address: 10.0.2.20
-
-  # 5. NAT GATEWAY: Network ACL layer
-  nat_gateway:
-    image: alpine:latest
-    container_name: nat_gateway
-    privileged: true   
-    command: >
-      sh -c "
-      echo 1 > /proc/sys/net/ipv4/ip_forward &&
-      apk add --no-cache iptables &&
-      iptables -F &&
-      iptables -A FORWARD -s 10.0.2.0/24 -d 203.0.113.5 -j DROP &&
-      iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE &&
-      sleep infinity
-      "
-    networks:
-      public_net:
-        ipv4_address: 10.0.1.50   
-      private_net:
-        ipv4_address: 10.0.2.50   
-
+# =========================================================================
+# ZERO TRUST MICRO-SEGMENTATION NETWORKS
+# =========================================================================
 networks:
-  public_net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 10.0.1.0/24     
-  private_net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 10.0.2.0/24
+  gateway_to_backend_net:
+    driver: bridge # Isolates Gateway -> Backend traffic
+  backend_to_db_net:
+    driver: bridge # Isolates Backend -> Database traffic. Gateway cannot reach here!

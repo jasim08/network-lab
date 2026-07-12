@@ -1,0 +1,54 @@
+graph TD
+    %% Styling
+    classDef client fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#263238;
+    classDef igw fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100;
+    classDef edge fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#b71c1c;
+    classDef net1 fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b;
+    classDef net2 fill:#efebe9,stroke:#5d4037,stroke-width:2px,color:#3e2723;
+
+    %% Attacker vs User
+    subgraph Users ["🌐 External Internet Traffic"]
+        User["Normal User"]
+        Attacker["DDoS Botnet / Hacker"]
+    end
+    class Users,User,Attacker client;
+
+    IGW["🔌 Internet Gateway Layer"]
+    class IGW igw;
+
+    %% Edge Shield
+    subgraph WAF_Shield ["🛡️ Edge Security Controls"]
+        WAF["Web Application Firewall<br>(Blocks SQLi / XSS Patterns)"]
+        DDoS["DDoS Rate Limiter<br>(Drops Traffic Floods)"]
+    end
+    class WAF_Shield,WAF,DDoS edge;
+
+    %% Zero Trust Zone 1
+    subgraph Net1 ["🔹 Segment A: gateway_to_backend_net"]
+        App1["app_backend_1"]
+        App2["app_backend_2"]
+    end
+    class Net1,App1,App2 net1;
+
+    %% Zero Trust Zone 2
+    subgraph Net2 ["🔸 Segment B: backend_to_db_net"]
+        Postgres["🔒 postgres_db<br>(Host Firewall Drop All)"]
+    end
+    class Net2,Postgres net2;
+
+    %% Flows
+    User --> IGW
+    Attacker -->|Launches Floods / Exploits| IGW
+    
+    IGW --> WAF_Shield
+    
+    WAF_Shield -->|Passed & Verified Traffic| App1
+    WAF_Shield -->|Passed & Verified Traffic| App2
+    
+    %% Segments cannot mix
+    App1 -->|Strict Database Query Zone| Postgres
+    App2 -->|Strict Database Query Zone| Postgres
+
+    %% Expressing explicit blocks
+    WAF_Shield -.->|Drop Malicious Queries| X["❌ 403 Forbidden"]
+    class X edge;
