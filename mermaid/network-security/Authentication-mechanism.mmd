@@ -1,0 +1,48 @@
+graph TD
+    %% Styling
+    classDef client fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#263238;
+    classDef edge fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#b71c1c;
+    classDef app fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b;
+    classDef idp fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c;
+
+    %% 1. USER & SSO LAYER
+    subgraph Client_Layer ["💻 User Access Layer"]
+        User["👤 Human Employee"]
+        MFA["📱 MFA Validation<br>(OTP / Biometrics)"]
+        User -->|1. Authenticates via MFA| MFA
+    end
+    class Client_Layer,User,MFA client;
+
+    %% 2. SSO IDENTITY PROVIDER
+    subgraph Identity_Provider ["🏢 Central Identity Provider (IdP)"]
+        SSO["SSO Portal<br>(Okta / Keycloak)"]
+        OIDC["🆔 OpenID Connect / OAuth2<br>(Issues JWT ID & Access Tokens)"]
+        SSO --> OIDC
+    end
+    class Identity_Provider,SSO,OIDC idp;
+    MFA -->|2. Requests Single Sign-On| SSO
+
+    %% 3. EDGE GATEWAY WITH SESSIONS & WAF
+    subgraph Edge_Gateway ["🛡️ Nginx Gateway / Reverse Proxy"]
+        WAF["WAF Shield"]
+        SessionCheck["🍪 Session Cookie Inspector<br>(HttpOnly / SameSite)"]
+        WAF --> SessionCheck
+    end
+    class Edge_Gateway,WAF,SessionCheck edge;
+    OIDC -->|3. Issues Token to Browser Cookie| SessionCheck
+
+    %% 4. INTERNAL APPLICATION SEGMENT
+    subgraph App_Tier ["📦 Microservice Compute Subnet"]
+        App1["app_backend_1<br>(Decodes JWT Claims)"]
+        App2["app_backend_2<br>(Validates stateless keys)"]
+    end
+    class App_Tier,App1,App2 app;
+    SessionCheck -->|4. Load Balances Valid Traffic| App1
+    SessionCheck -->|4. Load Balances Valid Traffic| App2
+
+    %% 5. B2B EXTERNAL API PIPELINE
+    subgraph External_API ["🔌 External Third Party (Stripe / Twilio)"]
+        ThirdParty["External API Endpoints"]
+    end
+    class External_API,ThirdParty client;
+    App1 -->|5. Machine Auth via API Keys| ThirdParty

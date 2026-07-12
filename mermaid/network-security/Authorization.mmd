@@ -1,0 +1,50 @@
+graph TD
+    %% Styling
+    classDef request fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#263238;
+    classDef gate fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#b71c1c;
+    classDef engine fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c;
+    classDef resource fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b;
+
+    %% Request Entry
+    subgraph Client_Inbound ["📟 The Request Context"]
+        Req["Incoming HTTP Request"]
+        Token["🪙 JWT containing:<br>- Scopes (App permissions)<br>- Claims (User Attributes)"]
+        Req ---> Token
+    end
+    class Client_Inbound,Req,Token request;
+
+    %% Authorization Steps
+    subgraph Auth_Engine ["🛡️ Core Authorization Policy Enforcement Point"]
+        
+        Step1{"1. Scope Check<br>(OAuth2 Evaluation)"}
+        Step2{"2. RBAC Check<br>(Role vs Permissions)"}
+        Step3{"3. ABAC Evaluation<br>(Context & Attributes)"}
+        
+        Step1 -->|Valid Scope| Step2
+        Step2 -->|User Has Required Permission| Step3
+    end
+    class Auth_Engine,Step1,Step2,Step3 engine;
+    Token --> Step1
+
+    %% Resource Layer / ACL
+    subgraph Resource_Tier ["🔒 Data & Resource Storage Subnet"]
+        ACL_Check{"4. Object ACL Check<br>(Resource Owner Level)"}
+        Database[("🗄️ Database Record / File")]
+        
+        ACL_Check -->|Identity Approved| Database
+    end
+    class Resource_Tier,ACL_Check,Database resource;
+    
+    Step3 -->|Attributes Match Policy| ACL_Check
+
+    %% Failure Exits
+    Exit1["❌ 403 Forbidden: Scope Mismatch"]
+    Exit2["❌ 403 Forbidden: Missing Required Role"]
+    Exit3["❌ 403 Forbidden: Contextual Attribute Policy Violation"]
+    Exit4["❌ 403 Forbidden: Denied by Resource ACL"]
+    class Exit1,Exit2,Exit3,Exit4 gate;
+
+    Step1 -.->|Failed| Exit1
+    Step2 -.->|Failed| Exit2
+    Step3 -.->|Failed| Exit3
+    ACL_Check -.->|Failed| Exit4
