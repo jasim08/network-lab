@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    actor Laptop as 💻 Laptop Browser
+    participant Gateway as 🛡️ nginx_gateway
+    participant App as 📦 app_backend_1
+    participant DB as 🔒 postgres_db
+
+    Note over Laptop,Gateway: Public Plain/Encrypted Data Pipeline
+    Laptop->>Gateway: HTTP Request (Port 8080)
+    Gateway->>App: Forward Request (Segment A)
+
+    Note over App,DB: Zero-Trust mTLS Pipeline (Segment B)
+    App->>DB: 1. TLS Handshake: ClientHello
+    DB->>App: 2. ServerHello + Sends postgres.crt
+    Note over App: App verifies DB identity<br>using rootCA.crt
+    App->>DB: 3. Sends app_backend.crt + Client Key Exchange
+    Note over DB: DB verifies App identity<br>using rootCA.crt
+    App->>DB: 4. Establishes Cryptographic Tunnel
+
+    App->>DB: 🔒 Encrypted SQL Query (TLS 1.3)
+    DB->>App: 🔒 Encrypted Data Result
+    App->>Gateway: HTTP Response
+    Gateway->>Laptop: HTTP Response Result

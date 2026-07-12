@@ -1,6 +1,6 @@
 const express = require('express');
 const { Pool } = require('pg');
-
+const fs =  require('fs')
 const app = express();
 app.use(express.json());
 
@@ -10,6 +10,12 @@ const pool = new Pool({
   user: process.env.PGUSER || 'user',
   password: process.env.PGPASSWORD || 'password',
   database: process.env.PGDATABASE || 'postgres',
+  ssl: {
+    rejectUnauthorized: true,                  // ENFORCES strict certificate checking
+    ca: fs.readFileSync('/certs/rootCA.crt'),  // The CA that signed the DB cert
+    key: fs.readFileSync('/certs/app_backend.key'), // Client Private Key
+    cert: fs.readFileSync('/certs/app_backend.crt') // Client Identity Certificate
+  }
 });
 
 async function initDb() {
