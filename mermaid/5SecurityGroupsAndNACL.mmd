@@ -1,0 +1,73 @@
+graph TD
+    %% Styling
+    classDef public fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b;
+    classDef private fill:#efebe9,stroke:#5d4037,stroke-width:2px,color:#3e2723;
+    classDef gateway fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20;
+    classDef host fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#263238;
+    classDef igw fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100;
+    classDef security fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,color:#e65100;
+    classDef naclStyle fill:#ffcdd2,stroke:#d32f2f,stroke-width:2px,color:#b71c1c;
+
+    %% Host Laptop / Outside World
+    subgraph Host ["💻 Physical Laptop (The Internet)"]
+        Browser["🌐 Web Browser (Port 8080)"]
+        Terminal["📟 SSH Client (Port 2222)"]
+    end
+    class Host,Browser,Terminal host;
+
+    %% Internet Gateway Layer
+    subgraph IGW_Layer ["🔌 Internet Gateway (IGW) Layer"]
+        IGW["Docker Port Forwarder<br>(Static NAT Translation)"]
+    end
+    class IGW_Layer,IGW igw;
+
+    %% VPC Space
+    subgraph VPC ["🌐 Simulated VPC Space"]
+        
+        %% Public Subnet
+        subgraph PublicSubnet ["🔓 Public Subnet (10.0.1.0/24)"]
+            Nginx["nginx_proxy<br>(10.0.1.X)"]
+        end
+        class PublicSubnet,Nginx public;
+
+        %% Cross Subnet Gateways / Bridges
+        App["app_backend<br>(Dual-Homed Node Service)"]
+        Bastion["bastion_host<br>(10.0.1.20 / 10.0.2.20)"]
+        class App,Bastion public;
+
+        %% NACL Protection Point at Subnet Boundary
+        subgraph NACL_Guard ["🛡️ Subnet Boundary: Network ACL (NACL)"]
+            NAT["nat_gateway<br>(10.0.1.50 / 10.0.2.50)<br>👉 NACL RULE: Drop 203.0.113.5"]
+        end
+        class NACL_Guard,NAT natStyle;
+
+        %% Private Subnet
+        subgraph PrivateSubnet ["🔒 Private Subnet (10.0.2.0/24)"]
+            
+            %% Security Group Guarding the Host Inside Private Subnet
+            subgraph SG_Guard ["🔒 Host Boundary: Security Group (SG)"]
+                Postgres["postgres_db<br>(10.0.2.X)<br>👉 SG RULE: Only allow Inbound 5432 from App/Bastion.<br>Drop all others."]
+            end
+            class SG_Guard,Postgres security;
+
+        end
+        class PrivateSubnet private;
+
+    end
+
+    %% Inbound Path Passing Checks
+    Browser --> IGW --> Nginx --> App
+    Terminal --> IGW --> Bastion
+    
+    %% Passing Security Group Check
+    Bastion -->|1. Request Port 5432| Postgres
+    App -->|2. Request Port 5432| Postgres
+    Note1[["postgres_db SG allows<br>App & Bastion IPs!"]] --- Postgres
+
+    %% Outbound Path Passing/Failing NACL Check
+    App -.->|3. Outbound Request| NAT
+    Postgres -.->|4. Outbound Request| NAT
+    
+    NAT -->|Blocked by NACL Rule| BlockTarget["❌ Malicious IP (203.0.113.5)"]
+    NAT -->|Allowed by NACL Rule| CleanTarget["✅ Google API (Allowed Outbound)"]
+    class BlockTarget,CleanTarget host;

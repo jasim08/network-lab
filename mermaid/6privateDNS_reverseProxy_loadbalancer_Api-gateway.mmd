@@ -1,0 +1,70 @@
+graph TD
+    %% Styling
+    classDef public fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b;
+    classDef private fill:#efebe9,stroke:#5d4037,stroke-width:2px,color:#3e2723;
+    classDef gateway fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20;
+    classDef host fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#263238;
+    classDef igw fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100;
+    classDef dns fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c;
+
+    %% Outside World
+    subgraph Host ["💻 Physical Laptop"]
+        Browser["🌐 Public Traffic Client"]
+    end
+    class Host,Browser host;
+
+    %% IGW Layer
+    IGW["🔌 Internet Gateway Layer<br>(Port Mapping)"]
+    class IGW igw;
+
+    %% VPC
+    subgraph VPC ["🌐 Production VPC Blueprint"]
+        
+        %% Public Subnet
+        subgraph PublicSubnet ["🔓 Public Subnet (10.0.1.0/24)"]
+            
+            %% Combined API Gateway & Reverse Proxy
+            subgraph Edge_Gateway ["🛡️ nginx_gateway (API Gateway & Proxy)"]
+                RateLimit["🛑 Rate Limiter<br>(Max 2 req/sec)"]
+                LoadBalancer["⚖️ Load Balancer<br>(Round-Robin)"]
+            end
+            class Edge_Gateway,RateLimit,LoadBalancer igw;
+
+            Bastion["📟 bastion_host<br>(Admin Entry)"]
+            class Bastion public;
+        end
+        class PublicSubnet public;
+
+        %% Private DNS Zone Block
+        subgraph DNS_Zone ["🔮 Private DNS Resolution Zone (.internal)"]
+            DNS1["backend.internal"]
+            DNS2["postgres_db.internal"]
+        end
+        class DNS_Zone,DNS1,DNS2 dns;
+
+        %% Shared Layer 
+        subgraph ComputeCluster ["📦 App Tier"]
+            App1["app_backend_1<br>(Node Replica 1)"]
+            App2["app_backend_2<br>(Node Replica 2)"]
+        end
+        class ComputeCluster,App1,App2 public;
+
+        %% Private Subnet
+        subgraph PrivateSubnet ["🔒 Private Subnet (10.0.2.0/24)"]
+            Postgres["🔒 postgres_db<br>(Security Group Enabled)"]
+        end
+        class PrivateSubnet,Postgres private;
+
+    end
+
+    %% Inbound Path through App Stack
+    Browser -->|Hits Port 8080| IGW
+    IGW --> Edge_Gateway
+    
+    %% Load Balancing Actions using Private DNS names
+    LoadBalancer -->|Route 1 via backend.internal| App1
+    LoadBalancer -->|Route 2 via backend.internal| App2
+    
+    %% Target Database connections leveraging private naming conventions
+    App1 -->|Query via postgres_db.internal| Postgres
+    App2 -->|Query via postgres_db.internal| Postgres
