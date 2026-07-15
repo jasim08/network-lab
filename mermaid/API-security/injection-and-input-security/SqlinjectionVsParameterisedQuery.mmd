@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    actor Attacker
+    participant App as Application Code
+    participant DB as Database Engine
+
+    rect rgb(240, 220, 220)
+        Note over Attacker, DB: VULNERABLE PATH (String Concatenation)
+        Attacker->>App: Input: ' OR '1'='1
+        App->>DB: Raw Query: SELECT * FROM users WHERE user = '' OR '1'='1'
+        Note over DB: Evaluates '1'='1' as TRUE
+        DB-->>App: Access Granted (Returns all records)
+    end
+
+    rect rgb(220, 240, 220)
+        Note over Attacker, DB: SECURED PATH (Parameterized Query)
+        Attacker->>App: Input: ' OR '1'='1
+        App->>DB: Query Template: SELECT * FROM users WHERE user = ? <br> (Parameters: ["' OR '1'='1"])
+        Note over DB: Treats input strictly as a literal string value.<br>Looks for a literal username: "' OR '1'='1"
+        DB-->>App: User not found (Access Denied)
+    end

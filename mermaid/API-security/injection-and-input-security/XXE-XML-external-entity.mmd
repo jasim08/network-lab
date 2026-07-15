@@ -1,0 +1,18 @@
+graph TD
+    %% Vulnerable flow
+    subgraph Vulnerable Parser Configuration
+        InputXML[XML Payload with System Entity<br><i>ENTITY xxe SYSTEM 'file:///etc/passwd'</i>] -->|Parsed| Server[XML Parser]
+        Server -->|Resolves External Entity| LocalSystem[Local File System /etc/passwd]
+        LocalSystem -->|Returns Sensitive Data| Server
+        Server -->|Response| Attacker[Attacker receives system files]
+    end
+
+    %% Secured flow
+    subgraph Secured Parser Configuration
+        InputXML2[XML Payload with System Entity] -->|Parsed| SafeServer[XML Parser]
+        SafeServer -->|disallow-doctype-decl = true| BlockAction[Parser throws exception / Discards DTDs]
+        BlockAction -->|Result| Denied[Safe Error Response: No entity resolution occurred]
+    end
+
+    style Vulnerable Parser Configuration fill:#ffe6e6,stroke:#ff8080
+    style Secured Parser Configuration fill:#e6ffe6,stroke:#80ff80

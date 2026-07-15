@@ -1,0 +1,14 @@
+flowchart TD
+    Request[Incoming API Request] --> RL{Rate Limiter}
+    RL -->|Tokens available in Bucket?| Yes[Yes: Consume 1 Token]
+    Yes --> Route[Route request to API Controller/Server]
+    
+    RL -->|No Tokens?| No[No: Bucket is Empty]
+    No --> Error[Return HTTP 429 Too Many Requests]
+    
+    subgraph Token Generator in background
+        Timer[Every X seconds] --> AddToken[Add N tokens to Bucket]
+        AddToken --> MaxCap{Is Bucket Full?}
+        MaxCap -->|Yes| Discard[Discard Overflow Tokens]
+        MaxCap -->|No| Store[Store in Redis/Memory Bucket]
+    end

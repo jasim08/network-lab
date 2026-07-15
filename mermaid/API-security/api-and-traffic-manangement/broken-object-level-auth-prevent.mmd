@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    actor Attacker as Attacker (User ID: 99)
+    participant API as API Gateway / Router
+    participant AuthZ as Authorization Service
+    participant DB as User Database
+
+    Attacker->>API: GET /api/v1/accounts/100 (Requesting User 100's Account)<br>Header: Authorization: Bearer JWT-for-User-99
+
+    API->>AuthZ: Is JWT Valid?
+    AuthZ-->>API: Yes, JWT is Valid (Belongs to User 99)
+
+    rect rgb(240, 220, 220)
+        Note over API, DB: VULNERABLE PATH
+        API->>DB: SELECT * FROM accounts WHERE id = 100
+        DB-->>API: Returns Account 100 Data
+        API-->>Attacker: Returns private data (Exploited!)
+    end
+
+    rect rgb(220, 240, 220)
+        Note over API, DB: SECURED PATH (Owner Validation Step)
+        API->>API: Check: Does JWT.sub (99) match Resource.owner (100)?
+        Note over API: Conflict! User 99 does not own Resource 100
+        API-->>Attacker: HTTP 403 Forbidden / HTTP 404 Not Found
+    end

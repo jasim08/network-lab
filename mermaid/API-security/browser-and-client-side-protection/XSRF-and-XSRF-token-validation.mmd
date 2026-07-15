@@ -1,0 +1,20 @@
+sequenceDiagram
+    autonumber
+    actor User as Victim Browser
+    participant MalSite as Malicious Website (evil.com)
+    participant Bank as Target Bank API (bank.com)
+
+    Note over User, Bank: User is logged into bank.com (Session Cookie is stored)
+    User->>MalSite: User visits evil.com
+    Note over MalSite: Page contains hidden auto-submitting form<br>POSTing to bank.com/transfer?amount=10000
+    MalSite->>User: Serves malicious form code
+    User->>Bank: Sends POST request to bank.com/transfer (Browser automatically attaches Bank Session Cookie!)
+
+    alt Case A: No CSRF Protection (Vulnerable)
+        Note over Bank: Validates Session Cookie (Authentic)
+        Bank-->>User: Transfer Successful (Money stolen)
+    else Case B: Anti-CSRF Token Validation (Secure)
+        Note over Bank: Checks for custom header:<br>X-XSRF-TOKEN in request
+        Note over Bank: Token is MISSING or INVALID (since evil.com cannot read it)
+        Bank-->>User: 403 Forbidden (Request Rejected)
+    end
