@@ -1,0 +1,40 @@
+graph TD
+    %% Section 1: The Problem
+    subgraph Problem [1. The Bloated 'Fat' Interface]
+        direction TB
+        FatInterface["⚡ MultiPurposeWorker Interface<br>(work, eat, sleep, code)"]
+        
+        Human["👨 Human Class<br>(Uses all methods)"] 
+        Robot["🤖 Robot Class<br>(Only needs work)"]
+        
+        FatInterface --> Human
+        FatInterface -->|Forced to implement eat & sleep| Robot
+        Robot --> Empty["❌ Throws 'NotImplementedError'"]
+    end
+
+    %% Section 2: The Action
+    Refactor{{"⚡ REFACTORING<br>(Split by Responsibility)"}}
+    Problem --> Refactor
+
+    %% Section 3: The Solution
+    subgraph Solution [2. The Segregated Clean Design]
+        direction TB
+        IWork["⚙️ Workable Interface<br>(work)"]
+        IEat["🍏 Feedable Interface<br>(eat)"]
+        
+        NewHuman["👨 Human Class"]
+        NewRobot["🤖 Robot Class"]
+        
+        IWork --> NewHuman
+        IEat  --> NewHuman
+        IWork --> NewRobot
+    end
+    
+    Refactor --> Solution
+
+    %% Styling
+    style FatInterface fill:#ffcccc,stroke:#333,stroke-width:2px
+    style Empty fill:#ffb3b3,stroke:#f00,stroke-width:1px
+    style IWork fill:#d4edda,stroke:#333,stroke-width:2px
+    style IEat fill:#d4edda,stroke:#333,stroke-width:2px
+    style Refactor fill:#fff3cd,stroke:#ffc107,stroke-width:2px

@@ -1,0 +1,32 @@
+graph TD
+    classDef red fill:#ffcccc,stroke:#cc0000,stroke-width:2px;
+    classDef yellow fill:#fff3cd,stroke:#ffc107,stroke-width:2px;
+    classDef green fill:#d4edda,stroke:#28a745,stroke-width:2px;
+    classDef code fill:#f8f9fa,stroke:#6c757d,stroke-width:1px;
+
+    %% --- PROBLEM BLOCK ---
+    subgraph Problem2 [1. Closed for Extension - Violates OCP]
+        direction LR
+        Processor["💳 PaymentProcessor Class"]:::red
+        
+        Processor -->|"Hardcoded checks"| CreditCheck["if (type === 'credit') { ... }<br>else if (type === 'paypal') { ... }"]:::red
+        
+        BadCode["📝 Bad JS Code:<br>class PaymentProcessor {<br>&nbsp;&nbsp;process(amount, type) {<br>&nbsp;&nbsp;&nbsp;&nbsp;if (type === 'credit') { ... }<br>&nbsp;&nbsp;&nbsp;&nbsp;else if (type === 'paypal') { ... }<br>&nbsp;&nbsp;}<br>}"]:::code
+    end
+
+    %% --- REFACTOR BLOCK ---
+    Refactor2{{"⚡ REFACTORING<br>Introduce Polymorphism"}}:::yellow
+    Problem2 --> Refactor2
+
+    %% --- SOLUTION BLOCK ---
+    subgraph Solution2 [2. Open for Extension - Follows OCP]
+        direction LR
+        BasePayment["🔌 Base Contract:<br>class PaymentMethod {<br>&nbsp;&nbsp;process(amount) {}<br>}"]:::green
+        
+        BasePayment --> Credit["💳 CreditPayment<br>process(amount) { ... }"]:::green
+        BasePayment --> Paypal["🌐 PaypalPayment<br>process(amount) { ... }"]:::green
+        
+        GoodCode["📝 Good JS Code:<br>class CreditPayment extends PaymentMethod {<br>&nbsp;&nbsp;process(amount) { console.log('Credit') }<br>}<br><br>// ShoppingCart calls .process() blindly:<br>cart.checkout(amt, paymentMethod);"]:::code
+    end
+    
+    Refactor2 --> Solution2

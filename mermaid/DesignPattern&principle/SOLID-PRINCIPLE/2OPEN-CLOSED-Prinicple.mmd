@@ -1,0 +1,26 @@
+graph TD
+    classDef red fill:#ffcccc,stroke:#cc0000,stroke-width:2px;
+    classDef yellow fill:#fff3cd,stroke:#ffc107,stroke-width:2px;
+    classDef green fill:#d4edda,stroke:#28a745,stroke-width:2px;
+
+    subgraph Problem2 [1. Closed for Extension]
+        direction TB
+        Processor["💳 PaymentProcessor Class"]:::red
+        Processor -->|"if 'credit'"| CreditCheck["Process Credit"]
+        Processor -->|"elif 'paypal'"| PaypalCheck["Process PayPal"]
+        Processor -->|"⚠️ Must modify class for new types"| CryptoCheck["Process Crypto"]:::red
+    end
+
+    Refactor2{{"⚡ REFACTORING<br>Use Polymorphism"}}:::yellow
+    Problem2 --> Refactor2
+
+    subgraph Solution2 [2. Open for Extension]
+        direction TB
+        BasePayment["🔌 Base Payment Method<br>Contract: .process"]:::green
+        Credit["💳 CreditPayment<br>Overrides .process"]:::green
+        Paypal["🌐 PaypalPayment<br>Overrides .process"]:::green
+        
+        BasePayment --> Credit
+        BasePayment --> Paypal
+    end
+    Refactor2 --> Solution2
