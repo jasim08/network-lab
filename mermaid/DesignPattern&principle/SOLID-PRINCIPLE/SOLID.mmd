@@ -1,0 +1,56 @@
+graph TD
+    classDef red fill:#ffcccc,stroke:#cc0000,stroke-width:2px;
+    classDef yellow fill:#fff3cd,stroke:#ffc107,stroke-width:2px;
+    classDef green fill:#d4edda,stroke:#28a745,stroke-width:2px;
+
+    %% --- SINGLE RESPONSIBILITY PRINCIPLE ---
+    S_Bad["❌ Bloated Class<br>(Data + DB + Email)"]:::red
+    S_Fix{{"⚡ Introduce:<br>Separation of Concerns"}}:::yellow
+    S_Good["✅ Single-Purpose Classes<br>(Invoice, Repo, Mailer)"]:::green
+    
+    S_Bad --> S_Fix --> S_Good
+
+    %% --- OPEN/CLOSED PRINCIPLE ---
+    O_Bad["❌ Hardcoded 'if/else'<br>checks for types"]:::red
+    O_Fix{{"⚡ Introduce:<br>Polymorphism"}}:::yellow
+    O_Good["✅ Shared Method Names<br>(Open for extension)"]:::green
+    
+    O_Bad --> O_Fix --> O_Good
+
+    %% --- LISKOV SUBSTITUTION PRINCIPLE ---
+    L_Bad["❌ Broken Inheritance<br>(Ostrich forced to fly)"]:::red
+    L_Fix{{"⚡ Introduce:<br>Proper Class Hierarchies"}}:::yellow
+    L_Good["✅ Safe Subclassing<br>(No unexpected errors)"]:::green
+    
+    L_Bad --> L_Fix --> L_Good
+
+    %% --- INTERFACE SEGREGATION PRINCIPLE ---
+    I_Bad["❌ Bloated Interfaces<br>(Forcing dummy implementations)"]:::red
+    I_Fix{{"⚡ Introduce:<br>Composition & Thin Interfaces"}}:::yellow
+    I_Good["✅ Highly Specific Roles<br>(Workable, Feedable)"]:::green
+    
+    I_Bad --> I_Fix --> I_Good
+
+    %% --- DEPENDENCY INVERSION PRINCIPLE ---
+    D_Bad["❌ Tightly Coupled Logic<br>(High-level imports Low-level)"]:::red
+    D_Fix{{"⚡ Introduce:<br>Dependency Injection & Abstraction"}}:::yellow
+    D_Good["✅ Decoupled Architecture<br>(Both depend on Interfaces)"]:::green
+    
+    D_Bad --> D_Fix --> D_Good
+
+    %% --- LINKING THE HEADERS ---
+    subgraph S [S - Single Responsibility]
+        S_Bad
+    end
+    subgraph O [O - Open/Closed]
+        O_Bad
+    end
+    subgraph L [L - Liskov Substitution]
+        L_Bad
+    end
+    subgraph I [I - Interface Segregation]
+        I_Bad
+    end
+    subgraph D [D - Dependency Inversion]
+        D_Bad
+    end
